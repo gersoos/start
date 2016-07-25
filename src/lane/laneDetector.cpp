@@ -56,6 +56,15 @@ void LaneDetection::init()
 	intStore["G_ROI_W"] = 2000;
 	intStore["G_ROI_H"] = 1300;
 
+	// Canny
+	intStore["CANNY_HI"]  = 180;
+	intStore["CANNY_LOW"] = 100;
+
+	// AdaptiveThreshold
+	intStore["ATH_BLOCK"] = 25;
+	intStore["ATH_VALUE"] = 15;
+
+
 	double dists[] = {16,2,77,29};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
@@ -242,6 +251,45 @@ void LaneDetection::initLaneModels(std::vector<double> distances) {
 
 void LaneDetection::detectLineFeatures()
 {
+	Mat input = imageStore["ground"];
+
+	Mat canny;
+	Mat grayscale;
+	Mat th;
+	Mat features;
+	Mat featuresDebug;
+
+	int th1 = getInt("CANNY_HI");
+	int th2 = getInt("CANNY_LOW");
+
+	double maxValue    = 255;
+	int adaptiveMethod = cv::ADAPTIVE_THRESH_MEAN_C;
+	int thresholdType  = cv::THRESH_BINARY_INV;
+	int blockSize      = getInt("ATH_BLOCK");
+	double constant    = getInt("ATH_VALUE");
+
+	int dilateSize = 3;
+
+	Canny(input, canny, th1, th2);
+
+
+	if (input.type() == CV_8UC3)
+	{
+		cv::cvtColor(input, grayscale, CV_RGB2GRAY);
+	}
+	else if (input.type() == CV_8UC1)
+	{
+		grayscale = input;
+	}
+	adaptiveThreshold(grayscale, th, maxValue, adaptiveMethod, thresholdType, blockSize, constant);
+
+	add(canny, th, features);
+
+	Mat element = getStructuringElement(cv::MORPH_ELLIPSE, Size(2 * dilateSize + 1, 2 * dilateSize + 1), Point(dilateSize, dilateSize));
+	dilate(features, featuresDebug, element);
+
+	imageStore["lineFeatures"]  = features;
+	imageStore["featuresDebug"] = featuresDebug;
 
 }
 
