@@ -6,6 +6,9 @@
 
 namespace lane{
 
+/**
+ * @brief The Operation class
+*/
 class Operation{
 public:
 	Operation();

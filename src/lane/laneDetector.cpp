@@ -56,7 +56,9 @@ void LaneDetection::init()
 	intStore["G_ROI_W"] = 2000;
 	intStore["G_ROI_H"] = 1300;
 
-
+	double dists[] = {16,2,77,29};
+	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
+	lanes.initLineModel(lineDistances);
 }
 
 void LaneDetection::preprocess()
