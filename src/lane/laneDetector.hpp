@@ -54,7 +54,8 @@ private:
 
 	void initLaneModels(std::vector<double> distances);
 
-	void detectLineFeatures();
+	void extractPointFeatures();
+	void detectLineFeatres();
 
 	void updateLineModels();
 	void updateLaneModels();
