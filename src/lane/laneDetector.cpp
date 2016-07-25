@@ -58,7 +58,7 @@ void LaneDetection::init()
 
 	double dists[] = {16,2,77,29};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
-	lanes.initLineModel(lineDistances);
+	initLaneModels(lineDistances);
 }
 
 void LaneDetection::preprocess()
@@ -169,6 +169,24 @@ void LaneDetection::projectFrameToGound()
 	imageStore["groundDebug"] = groundDebug;
 }
 
+void LaneDetection::displayLineModels()
+{
+	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
+	{
+
+		std::cout << "line:" << model[*line_ref].r_ << std::endl;
+	}
+}
+
+void LaneDetection::displayLaneModels()
+{
+	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
+	{
+		std::cout << "lane:" << model[*lane_ref].r_ << std::endl;
+	}
+
+}
+
 
 void LaneDetection::displayAll()
 {
@@ -178,6 +196,10 @@ void LaneDetection::displayAll()
 		namedWindow(it->first,WINDOW_OPENGL);
 		imshow(it->first, it->second);
 	}
+
+	std::cout << "NN" << std::endl;
+	displayLineModels();
+	displayLaneModels();
 }
 
 int LaneDetection::process(cv::Mat input)
@@ -186,11 +208,42 @@ int LaneDetection::process(cv::Mat input)
 
 	preprocess();
 	projectFrameToGound();
+
+	detectLineFeatures();
+	updateLineModels();
+	updateLaneModels();
+
 	displayAll();
 
 	return 0;
 }
 
+void LaneDetection::updateLineModels() {
+
+}
+
+void LaneDetection::updateLaneModels()
+{
+
+}
+
+void LaneDetection::initLaneModels(std::vector<double> distances) {
+	for(std::vector<double>::iterator it = distances.begin(); it != distances.end(); it++)
+	{
+		LaneProperty propLane(*it);
+		LineProperty propLeftLine(*it-1);
+		LineProperty propRightLine(*it+1);
+
+		Line s= add_vertex(propLeftLine, model);
+		Line t= add_vertex(propRightLine, model);
+		add_edge(s,t,propLane, model);
+	}
+}
+
+void LaneDetection::detectLineFeatures()
+{
+
+}
 
 }
 

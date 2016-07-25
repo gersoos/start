@@ -8,6 +8,7 @@ project(${a_dir})
 file(GLOB SOURCES "*.cpp")
 
 find_package( OpenCV REQUIRED)
+find_package( Boost  REQUIRED)
 
 add_executable(${a_dir} ${SOURCES})
 target_link_libraries(${a_dir} ${OpenCV_LIBS} )

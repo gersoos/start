@@ -1,8 +1,8 @@
 #ifndef LANE_UTILS_HPP
 #define LANE_UTILS_HPP
 
-#include <string>
 #include <opencv2/core.hpp>
+#include <string>
 
 namespace lane{
 

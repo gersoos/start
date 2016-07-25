@@ -1,17 +1,17 @@
 #ifndef LANE_LANE_MODEL_HPP
 #define LANE_LANE_MODEL_HPP
 
-#include <vector>
-
 namespace lane {
 
-/**
- * @brief The LineModel class
-*/
 
-class LineModel {
+/**
+ * @brief The LineProperty class
+ *
+ * LineProperty is a pod VALUE type class
+ */
+class LineProperty {
 public:
-	LineModel(double r, double fi = 0, int score=0):
+	LineProperty(double r = 0, double fi = 0, int score=0):
 		r_(r), fi_(fi), score_(score) {}
 
 	double r_; ///< distance on ground plane - pixel
@@ -20,18 +20,20 @@ public:
 };
 
 /**
- * @brief The LaneModel class
+ * @brief The LaneProperty class
+ *
+ * LanePropert is a pod VALUE type class
  */
-class LaneModel {
+class LaneProperty {
 public:
-	void initLineModel(std::vector<double> distances);
-	void updateLineModel();
+	LaneProperty(double r = 0, double fi = 0, int score=0):
+		r_(r), fi_(fi), score_(score) {}
 
-protected:
-	typedef std::vector<LineModel> Lines;
-	Lines lines;
-
+	double r_; ///< distance on ground plane - pixel
+	double fi_; ///< orientation on ground plane - rad 0 is vertical
+	int score_;  ///< score
 };
+
 
 
 } // namespace

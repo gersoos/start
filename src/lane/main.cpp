@@ -32,8 +32,7 @@ Diagram is generated using plantuml
 @startuml{objects.png}
 title Objects
 
-LaneDetector --> "lanes" LaneModel
-LaneModel *-- "lines" LineModel
+LaneDetector --> "model" Graph
 
 @enduml
 
