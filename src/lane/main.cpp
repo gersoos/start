@@ -4,7 +4,7 @@
 
 int main(int, char**)
 {
-	cv::VideoCapture cap(0); // open the default camera
+	cv::VideoCapture cap("/home/beegee/Downloads/GOPR5936PART.MP4"); // open the default camera
 	if(!cap.isOpened())  // check if we succeeded
 		return -1;
 
