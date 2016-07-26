@@ -234,11 +234,11 @@ void LaneDetection::init()
 
 	// Hough
 	intStore["HOUGH_RHO"]       = 5;
-	intStore["HOUGH_TH"]        = 2000;
-	intStore["HOUGH_LINECOUNT"] = 640;
+	intStore["HOUGH_TH"]        = 1500;
+	intStore["HOUGH_LINECOUNT"] = 340;
 
 
-	double dists[] = {1170,1470,1780};
+	double dists[] = {1170,1470,1880};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
 
