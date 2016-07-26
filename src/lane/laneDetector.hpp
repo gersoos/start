@@ -5,6 +5,8 @@
 
 #include "utils.hpp"
 #include <map>
+#include <vector>
+#include <opencv2/videoio.hpp>
 
 #include <boost/graph/adjacency_list.hpp>
 
@@ -43,8 +45,11 @@ private:
 	typedef Graph::edge_iterator LaneIterator;
 
 
-
+	std::vector<cv::Vec2f> houghLines;
+	cv::Mat warpTr;
 	Graph model;
+
+	cv::VideoWriter vv; /// HACK
 
 	void preprocess(); ///< generates "filtered" image, uses "input"
 	void projectFrameToGound(); ///< projects input image using calibration data
