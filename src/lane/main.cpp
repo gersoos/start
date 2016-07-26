@@ -79,6 +79,10 @@ int main(int, char**)
 
 		lane.process(frame);
 		if(cv::waitKey(30) >= 0) break;
+		if (i>3100)
+		{
+			break;
+		}
 	}
 	// the camera will be deinitialized automatically in VideoCapture destructor
 	return 0;

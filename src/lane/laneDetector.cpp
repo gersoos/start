@@ -238,7 +238,7 @@ void LaneDetection::init()
 	intStore["HOUGH_LINECOUNT"] = 340;
 
 
-	double dists[] = {1170,1470,1880};
+	double dists[] = {1000,1280,1550,1720};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
 
@@ -426,7 +426,7 @@ int LaneDetection::process(cv::Mat input)
 }
 
 void LaneDetection::updateLineModels() {
-	float gate = 130;
+	float gate = 100;
 
 	std::vector<Vec2f> lines;
 
@@ -443,7 +443,14 @@ void LaneDetection::updateLineModels() {
 		vector<Point2f> left;
 
 		float r_mean = model[*line_ref].r_;
+		
+		{
+		Point pt1( r_mean, 100 );
+		Point pt2( r_mean, 500 );
+		line( imageStore["groundDebug"], pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
+		}
 		// gate all houghLines
+		std::cout << houghLines.size() << std::endl;
 		for(size_t i=0; i<houghLines.size(); i++)
 		{
 			if ( fabs(houghLines[i][0] - r_mean) < gate)
@@ -452,7 +459,7 @@ void LaneDetection::updateLineModels() {
 			}
 		}
 
-		if (left.size()>3 && left.size()<500)
+		if (left.size()>1 && left.size()<1500)
 		{
 			vector<Point2f> leftR = ransac(left);
 			if (leftR.size()>1)
@@ -507,8 +514,8 @@ void LaneDetection::initLaneModels(std::vector<double> distances) {
 	for(std::vector<double>::iterator it = distances.begin(); it != distances.end(); it++)
 	{
 		LaneProperty propLane(*it);
-		LineProperty propLeftLine(*it-150);
-		LineProperty propRightLine(*it+150);
+		LineProperty propLeftLine(*it);
+		LineProperty propRightLine(*it);
 
 		Line s= add_vertex(propLeftLine, model);
 		Line t= add_vertex(propRightLine, model);
@@ -573,6 +580,7 @@ void LaneDetection::detectLineFeatres()
 	float min_theta = -0.1;
 	float max_theta = 0.1;
 
+	houghLines.clear();
 	HoughLinesStandard2(input, rho, theta, threshold, houghLines, linesMax, min_theta, max_theta, hg);
 
 	/// Show the result
