@@ -7,9 +7,6 @@
 
 #include <iostream>
 
-
-
-
 using namespace cv;
 using namespace std;
 
@@ -120,7 +117,7 @@ void LaneDetection::init()
 	intStore["HOUGH_LINECOUNT"] = 340;
 
 
-	double dists[] = {1000,1280,1550,1720};
+	double dists[] = {1000,1280,1550,1700};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
 
@@ -237,11 +234,70 @@ void LaneDetection::projectFrameToGound()
 
 void LaneDetection::displayLineModels()
 {
+	Mat frame = imageStore["frame"];
+
+	Mat linesFound = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);
+	Mat linesFoundImg = frame.clone();
+	Mat result;
+
+
+	/// Show the result
 	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
 	{
 
-		//std::cout << "line:" << model[*line_ref].r_ << std::endl;
+		if (model[*line_ref].valid_)// model
+		{
+			float r = model[*line_ref].rMeas_;
+			float t = model[*line_ref].fiMeas_;
+			double cos_t = cos(t), sin_t = sin(t);
+			double x0 = r*cos_t, y0 = r*sin_t;
+			double alpha = 3000;
+
+			Point pt1( cvRound(x0 + alpha*(-sin_t)), cvRound(y0 + alpha*cos_t) );
+			Point pt2( cvRound(x0 - alpha*(-sin_t)), cvRound(y0 - alpha*cos_t) );
+			line( linesFound, pt1, pt2, Scalar(0,255,0), 10, LINE_AA);
+		}
+		// model
+		{
+			float r = model[*line_ref].r_;
+			float t = model[*line_ref].fi_;
+			double cos_t = cos(t), sin_t = sin(t);
+			double x0 = r*cos_t, y0 = r*sin_t;
+			double alpha = 3000;
+
+			Point pt1( cvRound(x0 + alpha*(-sin_t)), cvRound(y0 + alpha*cos_t) );
+			Point pt2( cvRound(x0 - alpha*(-sin_t)), cvRound(y0 - alpha*cos_t) );
+
+			int blue = 200 + model[*line_ref].score_; // fades to white
+			if (blue > 190) {
+				line( linesFound, pt1, pt2, Scalar(blue,0,0), 30, LINE_AA);
+			}
+		}
+
+
+		{
+			float r_mean = model[*line_ref].r_;
+			Point pt1( r_mean, 100 );
+			Point pt2( r_mean, 500 );
+			line( imageStore["groundDebug"], pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
+		}
 	}
+
+	// project detections to image plane
+	{
+		int    interpolationMode = cv::INTER_LINEAR;
+		bool   inverseMap = true;
+		double borderValue = 0.0;
+		int    borderMode = cv::BORDER_CONSTANT;
+
+		warpPerspective(linesFound, linesFoundImg, warpTr, imageStore["frame"].size(),
+				interpolationMode | (inverseMap ? cv::WARP_INVERSE_MAP : 0), borderMode, borderValue);
+		add(linesFoundImg,frame,linesFoundImg);
+		resize(linesFoundImg,result,Size(0,0),0.5,0.5);
+	}
+	imageStore["linesFoundImg"] = linesFoundImg;
+	imageStore["result"] = result;
+
 }
 
 void LaneDetection::displayLaneModels()
@@ -256,14 +312,17 @@ void LaneDetection::displayLaneModels()
 
 void LaneDetection::displayAll()
 {
+	displayLineModels();
+	displayLaneModels();
+
 	// TODO: mechanism for selecting debug images
+
 	/*
 	for(ImgeStoreType::iterator it= imageStore.begin();it!=imageStore.end();it++)
 	{
 		namedWindow(it->first,WINDOW_OPENGL);
 		imshow(it->first, it->second);
 	}
-
 	*/
 
 	namedWindow("ground",WINDOW_OPENGL);
@@ -274,34 +333,31 @@ void LaneDetection::displayAll()
 
 	vv << imageStore["result"];
 
-	//std::cout << "NN" << std::endl;
-	displayLineModels();
-	displayLaneModels();
 }
 
 int LaneDetection::process(cv::Mat input)
 {
 	imageStore["input"] = input;
 
-	std::cout << "preprocess" << std::endl;
+	//std::cout << "preprocess" << std::endl;
 	preprocess();
 
-	std::cout << "project" << std::endl;
+	//std::cout << "project" << std::endl;
 	projectFrameToGound();
 
-	std::cout << "extract" << std::endl;
+	//std::cout << "extract" << std::endl;
 	extractPointFeatures();
 
-	std::cout << "detect" << std::endl;
+	//std::cout << "detect" << std::endl;
 	detectLineFeatres();
 
-	std::cout << "update1" << std::endl;
+	//std::cout << "update1" << std::endl;
 	updateLineModels();
 
-	std::cout << "update2" << std::endl;
+	//std::cout << "update2" << std::endl;
 	updateLaneModels();
 
-	std::cout << "display" << std::endl;
+	//std::cout << "display" << std::endl;
 	displayAll();
 
 	return 0;
@@ -312,79 +368,58 @@ void LaneDetection::updateLineModels() {
 
 	std::vector<Vec2f> lines;
 
-	Mat ground = imageStore["ground"];
 	Mat frame = imageStore["frame"];
-	Mat linesFound = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);
-	Mat linesFoundImg = frame.clone();
-	Mat result;
-
 
 	// for all lines
+	vector<bool> houghPaired(houghLines.size(),false);
 	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
 	{
 		vector<Point2f> left;
 
-		float r_mean = model[*line_ref].r_;
+		double r_mean;
+		double fi_mean;
+		model[*line_ref].predict(r_mean, fi_mean); // predict the state of the next frame
+
 		
-		{
-		Point pt1( r_mean, 100 );
-		Point pt2( r_mean, 500 );
-		line( imageStore["groundDebug"], pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
-		}
 		// gate all houghLines
-		std::cout << houghLines.size() << std::endl;
 		for(size_t i=0; i<houghLines.size(); i++)
 		{
 			if ( fabs(houghLines[i][0] - r_mean) < gate)
 			{
 				left.push_back(houghLines[i]);
+				houghPaired[i] = true;
 			}
 		}
 
-		if (left.size()>1 && left.size()<1500)
+		if (left.size()>1)
 		{
 			vector<Point2f> leftR = ransac(left);
 			if (leftR.size()>1)
 			{
-				lines.push_back(Vec2f((leftR[0].x + leftR[1].x)/2, (leftR[0].y + leftR[1].y)/2));
 				// update!!!!!!
+				double r  = ( leftR[0].x + leftR[1].x)/2;
+				double fi = ( leftR[0].y + leftR[1].y)/2;
+
+				model[*line_ref].correct(r,fi); // Correct the state of the next frame after obtaining the measurements
+
+				lines.push_back(Vec2f(r,fi));
+				lines.push_back(Vec2f(model[*line_ref].r_,model[*line_ref].fi_));
+
+
 
 			}
 		}
+		else
+		{
+			model[*line_ref].notFound();
+		}
+
 
 
 	}
 
-	/// Show the result
-	for( size_t i = 0; i < lines.size(); i++ )
-	   {
-		float r = lines[i][0], t = lines[i][1];
-		double cos_t = cos(t), sin_t = sin(t);
-		double x0 = r*cos_t, y0 = r*sin_t;
-		double alpha = 3000;
+	// TODO: if houghPaired is 0 - new lane???
 
-		 Point pt1( cvRound(x0 + alpha*(-sin_t)), cvRound(y0 + alpha*cos_t) );
-		 Point pt2( cvRound(x0 - alpha*(-sin_t)), cvRound(y0 - alpha*cos_t) );
-		 line( ground, pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
-		 line( linesFound, pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
-	   }
-
-	// project detections to image plane
-	{
-		int    interpolationMode = cv::INTER_LINEAR;
-		bool   inverseMap = true;
-		double borderValue = 0.0;
-		int    borderMode = cv::BORDER_CONSTANT;
-
-		warpPerspective(linesFound, linesFoundImg, warpTr, imageStore["frame"].size(),
-				interpolationMode | (inverseMap ? cv::WARP_INVERSE_MAP : 0), borderMode, borderValue);
-		add(linesFoundImg,frame,linesFoundImg);
-		resize(linesFoundImg,result,Size(0,0),0.5,0.5);
-	}
-
-	imageStore["ground"] = ground;
-	imageStore["linesFoundImg"] = linesFoundImg;
-	imageStore["result"] = result;
 }
 
 void LaneDetection::updateLaneModels()
