@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include "laneDetector.hpp"
 
+#include <iostream>
 
 // TODO: consider using smart pointers insted of object members
 // TODO: use file based parameter initialization
@@ -59,6 +60,7 @@ Diagram is generated using plantuml
 
 int main(int, char**)
 {
+	int i = 0;
 	cv::VideoCapture cap("/home/beegee/Downloads/GOPR5936PART.MP4"); // open the default camera
 	if(!cap.isOpened())  // check if we succeeded
 		return -1;
@@ -68,11 +70,18 @@ int main(int, char**)
 
 	for(;;)
 	{
+		i++;
+		std::cout << i << std::endl;
+
 		cv::Mat frame;
 		cap >> frame; // get a new frame from camera
 
 		lane.process(frame);
 		if(cv::waitKey(30) >= 0) break;
+		if (i>3100)
+		{
+			break;
+		}
 	}
 	// the camera will be deinitialized automatically in VideoCapture destructor
 	return 0;

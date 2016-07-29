@@ -11,8 +11,52 @@
 
 
 using namespace cv;
+using namespace std;
 
 namespace lane{
+
+// Implementing RANSAC to remove outlier lines
+// Picking the best estimate having maximum number of inliers
+// TO DO: Better implementation
+vector<Point2f> ransac(vector<Point2f> data){
+	double _ransacThres = 0.02;
+
+	vector<Point2f> res;
+	int maxInliers = 0;
+
+	// Picking up the first sample
+	for(int i = 0;i < data.size();i++){
+		Point2f p1 = data[i];
+
+		// Picking up the second sample
+		for(int j = i + 1;j < data.size();j++){
+			Point2f p2 = data[j];
+			int n = 0;
+
+			// Finding the total number of inliers
+			for (int k = 0;k < data.size();k++){
+				Point2f p3 = data[k];
+				float normalLength = norm(p2 - p1);
+				float distance = abs((float)((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / normalLength);
+				if (distance < _ransacThres) n++;
+			}
+
+			// if the current selection has more inliers, update the result and maxInliers
+			if (n > maxInliers) {
+				res.clear();
+				maxInliers = n;
+				res.push_back(p1);
+				res.push_back(p2);
+			}
+
+		}
+
+	}
+
+	return res;
+}
+
+
 
 
 LaneDetection::LaneDetection()
@@ -76,9 +120,11 @@ void LaneDetection::init()
 	intStore["HOUGH_LINECOUNT"] = 340;
 
 
-	double dists[] = {16,2,77,29};
+	double dists[] = {1000,1280,1550,1720};
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
+
+	vv.open("out.avi", CV_FOURCC('M','J','P','G'),25,Size(1920/2,1080/2));
 }
 
 void LaneDetection::preprocess()
@@ -124,7 +170,7 @@ void LaneDetection::projectFrameToGound()
 
 
 	// calculate projection matrix
-	Mat warpTr = getPerspectiveTransform(cvSrc, cvDst);
+	warpTr = getPerspectiveTransform(cvSrc, cvDst);
 
 	warpPerspective(input, groundDebug, warpTr, ground.size(),
 			interpolationMode | (inverseMap ? cv::WARP_INVERSE_MAP : 0), borderMode, borderValue);
@@ -194,7 +240,7 @@ void LaneDetection::displayLineModels()
 	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
 	{
 
-		std::cout << "line:" << model[*line_ref].r_ << std::endl;
+		//std::cout << "line:" << model[*line_ref].r_ << std::endl;
 	}
 }
 
@@ -202,7 +248,7 @@ void LaneDetection::displayLaneModels()
 {
 	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
 	{
-		std::cout << "lane:" << model[*lane_ref].r_ << std::endl;
+		//std::cout << "lane:" << model[*lane_ref].r_ << std::endl;
 	}
 
 }
@@ -211,13 +257,24 @@ void LaneDetection::displayLaneModels()
 void LaneDetection::displayAll()
 {
 	// TODO: mechanism for selecting debug images
+	/*
 	for(ImgeStoreType::iterator it= imageStore.begin();it!=imageStore.end();it++)
 	{
 		namedWindow(it->first,WINDOW_OPENGL);
 		imshow(it->first, it->second);
 	}
 
-	std::cout << "NN" << std::endl;
+	*/
+
+	namedWindow("ground",WINDOW_OPENGL);
+	imshow("ground", imageStore["groundDebug"]);
+
+	namedWindow("processed",WINDOW_OPENGL);
+	imshow("processed", imageStore["result"]);
+
+	vv << imageStore["result"];
+
+	//std::cout << "NN" << std::endl;
 	displayLineModels();
 	displayLaneModels();
 }
@@ -226,21 +283,108 @@ int LaneDetection::process(cv::Mat input)
 {
 	imageStore["input"] = input;
 
+	std::cout << "preprocess" << std::endl;
 	preprocess();
+
+	std::cout << "project" << std::endl;
 	projectFrameToGound();
 
+	std::cout << "extract" << std::endl;
 	extractPointFeatures();
+
+	std::cout << "detect" << std::endl;
 	detectLineFeatres();
+
+	std::cout << "update1" << std::endl;
 	updateLineModels();
+
+	std::cout << "update2" << std::endl;
 	updateLaneModels();
 
+	std::cout << "display" << std::endl;
 	displayAll();
 
 	return 0;
 }
 
 void LaneDetection::updateLineModels() {
+	float gate = 100;
 
+	std::vector<Vec2f> lines;
+
+	Mat ground = imageStore["ground"];
+	Mat frame = imageStore["frame"];
+	Mat linesFound = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);
+	Mat linesFoundImg = frame.clone();
+	Mat result;
+
+
+	// for all lines
+	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
+	{
+		vector<Point2f> left;
+
+		float r_mean = model[*line_ref].r_;
+		
+		{
+		Point pt1( r_mean, 100 );
+		Point pt2( r_mean, 500 );
+		line( imageStore["groundDebug"], pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
+		}
+		// gate all houghLines
+		std::cout << houghLines.size() << std::endl;
+		for(size_t i=0; i<houghLines.size(); i++)
+		{
+			if ( fabs(houghLines[i][0] - r_mean) < gate)
+			{
+				left.push_back(houghLines[i]);
+			}
+		}
+
+		if (left.size()>1 && left.size()<1500)
+		{
+			vector<Point2f> leftR = ransac(left);
+			if (leftR.size()>1)
+			{
+				lines.push_back(Vec2f((leftR[0].x + leftR[1].x)/2, (leftR[0].y + leftR[1].y)/2));
+				// update!!!!!!
+
+			}
+		}
+
+
+	}
+
+	/// Show the result
+	for( size_t i = 0; i < lines.size(); i++ )
+	   {
+		float r = lines[i][0], t = lines[i][1];
+		double cos_t = cos(t), sin_t = sin(t);
+		double x0 = r*cos_t, y0 = r*sin_t;
+		double alpha = 3000;
+
+		 Point pt1( cvRound(x0 + alpha*(-sin_t)), cvRound(y0 + alpha*cos_t) );
+		 Point pt2( cvRound(x0 - alpha*(-sin_t)), cvRound(y0 - alpha*cos_t) );
+		 line( ground, pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
+		 line( linesFound, pt1, pt2, Scalar(0,255,0), 15, LINE_AA);
+	   }
+
+	// project detections to image plane
+	{
+		int    interpolationMode = cv::INTER_LINEAR;
+		bool   inverseMap = true;
+		double borderValue = 0.0;
+		int    borderMode = cv::BORDER_CONSTANT;
+
+		warpPerspective(linesFound, linesFoundImg, warpTr, imageStore["frame"].size(),
+				interpolationMode | (inverseMap ? cv::WARP_INVERSE_MAP : 0), borderMode, borderValue);
+		add(linesFoundImg,frame,linesFoundImg);
+		resize(linesFoundImg,result,Size(0,0),0.5,0.5);
+	}
+
+	imageStore["ground"] = ground;
+	imageStore["linesFoundImg"] = linesFoundImg;
+	imageStore["result"] = result;
 }
 
 void LaneDetection::updateLaneModels()
@@ -252,8 +396,8 @@ void LaneDetection::initLaneModels(std::vector<double> distances) {
 	for(std::vector<double>::iterator it = distances.begin(); it != distances.end(); it++)
 	{
 		LaneProperty propLane(*it);
-		LineProperty propLeftLine(*it-1);
-		LineProperty propRightLine(*it+1);
+		LineProperty propLeftLine(*it);
+		LineProperty propRightLine(*it);
 
 		Line s= add_vertex(propLeftLine, model);
 		Line t= add_vertex(propRightLine, model);
@@ -318,13 +462,13 @@ void LaneDetection::detectLineFeatres()
 	float min_theta = -0.1;
 	float max_theta = 0.1;
 
-	std::vector<Vec2f> lines;
-	HoughLinesStandard2(input, rho, theta, threshold, lines, linesMax, min_theta, max_theta, hg);
+	houghLines.clear();
+	HoughLinesStandard2(input, rho, theta, threshold, houghLines, linesMax, min_theta, max_theta, hg);
 
 	/// Show the result
-	for( size_t i = 0; i < lines.size(); i++ )
+	for( size_t i = 0; i < houghLines.size(); i++ )
 	{
-		float r = lines[i][0], t = lines[i][1];
+		float r = houghLines[i][0], t = houghLines[i][1];
 		double cos_t = cos(t), sin_t = sin(t);
 		double x0 = r*cos_t, y0 = r*sin_t;
 		double alpha = 3000;
