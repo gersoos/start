@@ -24,6 +24,8 @@ public:
 	virtual void init();
 	virtual int process(cv::Mat input);
 
+	int getNumberOfLanes();
+	cv::Mat getResultFrame();
 private:
 	/**
 	 * @brief Graph
@@ -31,6 +33,7 @@ private:
 	 * Vertex: Line with LineProperty
 	 * Edge: Lane with LaneProperty
 	 *
+	 * \see http://www.boost.org/doc/libs/1_55_0/libs/graph/doc/graph_concepts.html
 	 * \see http://www.boost.org/doc/libs/1_55_0/libs/graph/doc/bundles.html
 	 * \see http://www.boost.org/doc/libs/1_55_0/libs/graph/doc/adjacency_list.html
 	 *
@@ -49,7 +52,7 @@ private:
 	cv::Mat warpTr;
 	Graph model;
 
-	cv::VideoWriter vv; /// HACK
+	cv::VideoWriter vv; ///< VideoWriter for debug stream
 
 	void preprocess(); ///< generates "filtered" image, uses "input"
 	void projectFrameToGound(); ///< projects input image using calibration data

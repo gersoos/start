@@ -12,6 +12,11 @@ LineProperty::LineProperty(double r, double fi, int score):
 	init();
 }
 
+bool LineProperty::hasScore()
+{
+	return (score_>1);
+}
+
 void LineProperty::predict(double& r,double& fi)
 {
 	Mat prediction = kalman.predict();
@@ -47,21 +52,23 @@ void LineProperty::correct(double r, double fi)
 	fiMeas_ = fi;
 	valid_  = true;
 
+	score_++;
 }
 
 void LineProperty::reset()
 {
 	valid_ = false;
-	r_  = rReset_;
-	fi_ = 0;
+	r_     = rReset_;
+	fi_	   = 0;
+	score_ = 0;
 
+	init();
 	std::cout << "RESET" <<std::endl;
 }
 
 void LineProperty::init()
 {
 	kalman.init(2, 2, 0);
-	//kalman = new KalmanFilter( 4, 4, 0 ); // 4 measurement and state parameters
 	kalman.transitionMatrix = (Mat_<float>(2, 2) << 1,0,0,1);
 
 	// Initialization

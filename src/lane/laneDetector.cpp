@@ -117,11 +117,14 @@ void LaneDetection::init()
 	intStore["HOUGH_LINECOUNT"] = 340;
 
 
-	double dists[] = {1000,1280,1550,1700};
+	double dists[] = {1000,1290,1550,1730};
+	floatStore["LANE_WIDTH"]     = 250;
+	floatStore["LANE_GATE"]      = 110;
+
 	std::vector<double> lineDistances(dists,dists + sizeof(dists)/sizeof(double) );
 	initLaneModels(lineDistances);
 
-	vv.open("out.avi", CV_FOURCC('M','J','P','G'),25,Size(1920/2,1080/2));
+	vv.open("debug.avi", CV_FOURCC('M','J','P','G'),25,Size(intStore["GROUND_H"]/2,intStore["GROUND_W"]/2));
 }
 
 void LaneDetection::preprocess()
@@ -232,14 +235,17 @@ void LaneDetection::projectFrameToGound()
 	imageStore["groundDebug"] = groundDebug;
 }
 
+/**
+ * @brief LaneDetection::displayLineModels
+ */
 void LaneDetection::displayLineModels()
 {
+	/// Input: imageStore["frame"]
 	Mat frame = imageStore["frame"];
 
 	Mat linesFound = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);
 	Mat linesFoundImg = frame.clone();
 	Mat result;
-
 
 	/// Show the result
 	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
@@ -304,7 +310,12 @@ void LaneDetection::displayLaneModels()
 {
 	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
 	{
-		//std::cout << "lane:" << model[*lane_ref].r_ << std::endl;
+		{
+			float r_mean = model[*lane_ref].r_;
+			Point pt1( r_mean, 100 );
+			Point pt2( r_mean, 500 );
+			line( imageStore["groundDebug"], pt1, pt2, Scalar(0,0,255), 15, LINE_AA);
+		}
 	}
 
 }
@@ -331,8 +342,11 @@ void LaneDetection::displayAll()
 	namedWindow("processed",WINDOW_OPENGL);
 	imshow("processed", imageStore["result"]);
 
-	vv << imageStore["result"];
-
+	{
+		Mat result;
+		resize(imageStore["groundDebug"],result,Size(intStore["GROUND_H"]/2,intStore["GROUND_W"]/2));
+		vv << result;
+	}
 }
 
 int LaneDetection::process(cv::Mat input)
@@ -363,8 +377,35 @@ int LaneDetection::process(cv::Mat input)
 	return 0;
 }
 
+int LaneDetection::getNumberOfLanes()
+{
+	double mMin = 50000;
+	double mMax = -50000;
+
+	for(LineIterator line_ref = vertices(model).first; line_ref != vertices(model).second; ++line_ref)
+	{
+		if (model[*line_ref].r_ < mMin && model[*line_ref].score_ > 5)
+		{
+			mMin = model[*line_ref].r_;
+		}
+		if (model[*line_ref].r_ > mMax && model[*line_ref].score_ > 5)
+		{
+			mMax = model[*line_ref].r_;
+		}
+	}
+
+	//std::cout << mMax-mMin << " " << mMax << " " << mMin << std::endl;
+	return int( round (mMax - mMin) / floatStore["LANE_WIDTH"]) + 1;
+
+}
+
+Mat LaneDetection::getResultFrame()
+{
+	return imageStore["result"];
+}
+
 void LaneDetection::updateLineModels() {
-	float gate = 100;
+	float gate = floatStore["LANE_GATE"];
 
 	std::vector<Vec2f> lines;
 
@@ -408,6 +449,10 @@ void LaneDetection::updateLineModels() {
 
 
 			}
+			else
+			{
+				std::cout << "RANSAC" << std::endl;
+			}
 		}
 		else
 		{
@@ -424,19 +469,58 @@ void LaneDetection::updateLineModels() {
 
 void LaneDetection::updateLaneModels()
 {
+	float gate = floatStore["LANE_GATE"];
 
+	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
+	{
+		Line left  = source(*lane_ref, model);
+		Line right = target(*lane_ref, model);
+		if      ( model[right].hasScore() &&  model[right].hasScore())
+		{
+			if (model[right].r_ - model[left].r_ < gate)
+			{
+				std::cout << "dist: " << model[right].r_ << " " << model[left].r_ << std::endl;
+				model[left ].reset();
+				model[right].reset();
+			}
+		}
+		else if (!model[right].hasScore() &&  model[right].hasScore() )
+		{
+
+		}
+		else if ( model[right].hasScore() && !model[right].hasScore() )
+		{
+
+		}
+		else {
+
+		}
+
+	}
 }
 
 void LaneDetection::initLaneModels(std::vector<double> distances) {
-	for(std::vector<double>::iterator it = distances.begin(); it != distances.end(); it++)
-	{
-		LaneProperty propLane(*it);
-		LineProperty propLeftLine(*it);
-		LineProperty propRightLine(*it);
 
-		Line s= add_vertex(propLeftLine, model);
-		Line t= add_vertex(propRightLine, model);
+	if (distances.size()<2)
+	{
+		return;
+	}
+
+	std::vector<double>::iterator it1 = distances.begin();
+	std::vector<double>::iterator it2 = distances.begin();
+	it2++;
+	LineProperty propLeftLine(*it1);
+	Line s= add_vertex(propLeftLine,  model);
+	Line t;
+
+	for(; it1 != distances.end() && it2 != distances.end(); it1++,it2++)
+	{
+		LaneProperty propLane( (*it1 + *it2) / 2);
+		LineProperty propRightLine(*it2);
+
+		t = add_vertex(propRightLine, model);
 		add_edge(s,t,propLane, model);
+		s = t;
 	}
 }
 

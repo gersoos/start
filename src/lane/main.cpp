@@ -65,18 +65,30 @@ int main(int, char**)
 	if(!cap.isOpened())  // check if we succeeded
 		return -1;
 
+	cv::VideoWriter vv;
+	vv.open("out.avi", CV_FOURCC('M','J','P','G'),25,cv::Size(1920/2,1080/2));
+
 	lane::LaneDetection lane;
 	lane.init();
 
+	int FF = 0; // fast forward
 	for(;;)
 	{
 		i++;
-		std::cout << i << std::endl;
 
 		cv::Mat frame;
 		cap >> frame; // get a new frame from camera
+		if (i < FF)
+		{
+			continue;
+		}
 
 		lane.process(frame);
+
+		std::cout << i << ": " << lane.getNumberOfLanes() << std::endl;
+		cv::Mat resultFrame = lane.getResultFrame();
+		vv << resultFrame;
+
 		if(cv::waitKey(30) >= 0) break;
 		if (i>3100)
 		{

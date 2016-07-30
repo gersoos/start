@@ -24,6 +24,7 @@ public:
 	bool valid_; ///< last <rMeas_, fiMeas_> is valid
 
 	int score_;  ///< score
+	bool hasScore();
 
 	void predict(double& r,double& fi); ///< predict
 	void notFound(); ///< signal for empty gate range
