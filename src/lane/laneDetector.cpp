@@ -129,12 +129,21 @@ void LaneDetection::init()
 
 void LaneDetection::preprocess()
 {
+	/// Placeholder for spatio-temporal smoothing
+
+	/// @param[in]  imageStore["input"]
+	/// @param[out] imageStore["frame"]
 	Mat input = imageStore["input"];
 	imageStore["frame"] = input.clone();
 }
 
 void LaneDetection::projectFrameToGound()
 {
+	/// @param[in]  imageStore["frame"]
+
+	/// @param[in]  intStore["GROUND_H"]
+	/// @param[in]  intStore["GROUND_W"]
+
 	Mat input = imageStore["frame"];
 	Mat inputROI = input.clone();
 	Mat ground = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);;
@@ -142,11 +151,27 @@ void LaneDetection::projectFrameToGound()
 	Point2f cvSrc[4];
 	Point2f cvDst[4];
 
+	/// @param[in]  intStore["S1X"]
+	/// @param[in]  intStore["S1Y"]
+	/// @param[in]  intStore["S2X"]
+	/// @param[in]  intStore["S2Y"]
+	/// @param[in]  intStore["S3X"]
+	/// @param[in]  intStore["S3Y"]
+	/// @param[in]  intStore["S4X"]
+	/// @param[in]  intStore["S4Y"]
 	cvSrc[0] = Point2f(getInt("S1X"), getInt("S1Y"));
 	cvSrc[1] = Point2f(getInt("S2X"), getInt("S2Y"));
 	cvSrc[2] = Point2f(getInt("S3X"), getInt("S3Y"));
 	cvSrc[3] = Point2f(getInt("S4X"), getInt("S4Y"));
 
+	/// @param[in]  intStore["D1X"]
+	/// @param[in]  intStore["D1Y"]
+	/// @param[in]  intStore["D2X"]
+	/// @param[in]  intStore["D2Y"]
+	/// @param[in]  intStore["D3X"]
+	/// @param[in]  intStore["D3Y"]
+	/// @param[in]  intStore["D4X"]
+	/// @param[in]  intStore["D4Y"]
 	cvDst[0] = Point2f(getInt("D1X"), getInt("D1Y"));
 	cvDst[1] = Point2f(getInt("D2X"), getInt("D2Y"));
 	cvDst[2] = Point2f(getInt("D3X"), getInt("D3Y"));
@@ -178,6 +203,10 @@ void LaneDetection::projectFrameToGound()
 
 	Rect rect;
 	{
+		/// @param[in]  intStore["G_ROI_X"]
+		/// @param[in]  intStore["G_ROI_Y"]
+		/// @param[in]  intStore["G_ROI_W"]
+		/// @param[in]  intStore["G_ROI_H"]
 		int x = getInt("G_ROI_X");
 		int y = getInt("G_ROI_Y");
 		int sx = getInt("G_ROI_W");
@@ -230,19 +259,24 @@ void LaneDetection::projectFrameToGound()
 	}
 
 	// store images
+	/// @param[out] imageStore["inputROI"]
+	/// @param[out] imageStore["ground"]
+	/// @param[out] imageStore["groundDebug"]
+
 	imageStore["inputROI"] = inputROI;
 	imageStore["ground"] = ground;
 	imageStore["groundDebug"] = groundDebug;
 }
 
-/**
- * @brief LaneDetection::displayLineModels
- */
+
 void LaneDetection::displayLineModels()
 {
-	/// Input: imageStore["frame"]
+	/// @param[in]  imageStore["frame"]
+	/// @param[out] imageStore["groundDebug"]
 	Mat frame = imageStore["frame"];
 
+	/// @param[in]  intStore["GROUND_W"]
+	/// @param[in]  intStore["GROUND_H"]
 	Mat linesFound = cv::Mat::zeros(getInt("GROUND_H"), getInt("GROUND_W"), CV_8UC3);
 	Mat linesFoundImg = frame.clone();
 	Mat result;
@@ -301,6 +335,9 @@ void LaneDetection::displayLineModels()
 		add(linesFoundImg,frame,linesFoundImg);
 		resize(linesFoundImg,result,Size(0,0),0.5,0.5);
 	}
+
+	/// @param[out] imageStore["linesFoundImg"]
+	/// @param[out] imageStore["result"]
 	imageStore["linesFoundImg"] = linesFoundImg;
 	imageStore["result"] = result;
 
@@ -308,6 +345,9 @@ void LaneDetection::displayLineModels()
 
 void LaneDetection::displayLaneModels()
 {
+	/// @param[in]  imageStore["groundDebug"]
+	/// @param[out] imageStore["groundDebug"]
+
 	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
 	{
 		{
@@ -323,7 +363,13 @@ void LaneDetection::displayLaneModels()
 
 void LaneDetection::displayAll()
 {
+	/// @param[in] imageStore["groundDebug"]
+	/// @param[in] imageStore["result"]
+
+	/// @li displayLineModels();
 	displayLineModels();
+
+	/// @li displayLaneModels();
 	displayLaneModels();
 
 	// TODO: mechanism for selecting debug images
@@ -351,27 +397,29 @@ void LaneDetection::displayAll()
 
 int LaneDetection::process(cv::Mat input)
 {
+	/// @param[out] imageStore["input"]
+
 	imageStore["input"] = input;
 
-	//std::cout << "preprocess" << std::endl;
+	/// @li preprocess();
 	preprocess();
 
-	//std::cout << "project" << std::endl;
+	/// @li projectFrameToGound();
 	projectFrameToGound();
 
-	//std::cout << "extract" << std::endl;
+	/// @li extractPointFeatures();
 	extractPointFeatures();
 
-	//std::cout << "detect" << std::endl;
+	/// @li detectLineFeatres();
 	detectLineFeatres();
 
-	//std::cout << "update1" << std::endl;
+	/// @li updateLineModels();
 	updateLineModels();
 
-	//std::cout << "update2" << std::endl;
+	/// @li updateLaneModels();
 	updateLaneModels();
 
-	//std::cout << "display" << std::endl;
+	/// @li displayAll();
 	displayAll();
 
 	return 0;
@@ -394,6 +442,7 @@ int LaneDetection::getNumberOfLanes()
 		}
 	}
 
+	/// @param[in] floatStore["input"]
 	//std::cout << mMax-mMin << " " << mMax << " " << mMin << std::endl;
 	return int( round (mMax - mMin) / floatStore["LANE_WIDTH"]) + 1;
 
@@ -405,10 +454,12 @@ Mat LaneDetection::getResultFrame()
 }
 
 void LaneDetection::updateLineModels() {
+	/// @param[in]  floatStore["LANE_GATE"]
 	float gate = floatStore["LANE_GATE"];
 
 	std::vector<Vec2f> lines;
 
+	/// @param[in]  imageStore["input"]
 	Mat frame = imageStore["frame"];
 
 	// for all lines
@@ -469,6 +520,7 @@ void LaneDetection::updateLineModels() {
 
 void LaneDetection::updateLaneModels()
 {
+	/// @param[in]  floatStore["LANE_GATE"]
 	float gate = floatStore["LANE_GATE"];
 
 	for(LaneIterator lane_ref = edges(model).first; lane_ref != edges(model).second; ++lane_ref)
@@ -526,6 +578,7 @@ void LaneDetection::initLaneModels(std::vector<double> distances) {
 
 void LaneDetection::extractPointFeatures()
 {
+	/// @param[in]  imageStore["ground"]
 	Mat input = imageStore["ground"];
 
 	Mat canny;
@@ -534,9 +587,13 @@ void LaneDetection::extractPointFeatures()
 	Mat features;
 	Mat featuresDebug;
 
+	/// @param[in]  intStore["CANNY_HI"]
+	/// @param[in]  intStore["CANNY_LOW"]
 	int th1 = getInt("CANNY_HI");
 	int th2 = getInt("CANNY_LOW");
 
+	/// @param[in]  intStore["ATH_BLOCK"]
+	/// @param[in]  intStore["ATH_VALUE"]
 	double maxValue    = 255;
 	int adaptiveMethod = cv::ADAPTIVE_THRESH_MEAN_C;
 	int thresholdType  = cv::THRESH_BINARY_INV;
@@ -563,6 +620,8 @@ void LaneDetection::extractPointFeatures()
 	Mat element = getStructuringElement(cv::MORPH_ELLIPSE, Size(2 * dilateSize + 1, 2 * dilateSize + 1), Point(dilateSize, dilateSize));
 	dilate(features, featuresDebug, element);
 
+	/// @param[out] imageStore["pointFeatures"]
+	/// @param[out] imageStore["pointFeaturesDebug"]
 	imageStore["pointFeatures"]  = features;
 	imageStore["pointFeaturesDebug"] = featuresDebug;
 
@@ -570,10 +629,15 @@ void LaneDetection::extractPointFeatures()
 
 void LaneDetection::detectLineFeatres()
 {
+	/// @param[in]  imageStore["pointFeatures"]
+	/// @param[in]  imageStore["groundDebug"]
 	Mat input       = imageStore["pointFeatures"];
 	Mat groundDebug = imageStore["groundDebug"];
 	Mat hg;
 
+	/// @param[in]  intStore["HOUGH_RHO"]
+	/// @param[in]  intStore["HOUGH_TH"]
+	/// @param[in]  intStore["HOUGH_LINECOUNT"]
 	float rho = (float) getInt("HOUGH_RHO");
 	float theta = CV_PI/180;
 	int threshold = getInt("HOUGH_TH");
@@ -597,7 +661,7 @@ void LaneDetection::detectLineFeatres()
 		line( groundDebug, pt1, pt2, Scalar(255,0,0), 15, LINE_AA);
 	}
 
-	// dummy store
+	/// @param[out] imageStore["groundDebug"]
 	imageStore["groundDebug"] = groundDebug;
 }
 

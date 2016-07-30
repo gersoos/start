@@ -54,11 +54,11 @@ private:
 
 	cv::VideoWriter vv; ///< VideoWriter for debug stream
 
-	void preprocess(); ///< generates "filtered" image, uses "input"
+	void preprocess(); ///< generates spatio-temporal filtered image
 	void projectFrameToGound(); ///< projects input image using calibration data
-	void displayLineModels();
-	void displayLaneModels();
-	void displayAll();
+	void displayLineModels(); ///< generates images with overlay
+	void displayLaneModels(); ///< generates images with overlay
+	void displayAll(); ///< generates windows and display images
 
 	void initLaneModels(std::vector<double> distances);
 
@@ -67,7 +67,6 @@ private:
 
 	void updateLineModels();
 	void updateLaneModels();
-
 
 	typedef std::map<std::string,cv::Mat> ImgeStoreType;
 	ImgeStoreType imageStore;
